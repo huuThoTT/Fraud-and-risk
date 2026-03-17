@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-commerce Fraud Defense Pulse</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Background Animated Gradients -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar glass-panel">
+            <div class="brand">
+                <i class="fa-solid fa-shield-virus gradient-text"></i>
+                <h2>Pulse<span>DetX</span></h2>
+            </div>
+            <ul class="nav-links">
+                <li class="active"><i class="fa-solid fa-chart-line"></i> Live Feed</li>
+                <li><i class="fa-solid fa-spider"></i> Threat Matrix</li>
+                <li><i class="fa-solid fa-users-viewfinder"></i> User Analysis</li>
+                <li><i class="fa-solid fa-gear"></i> Settings</li>
+            </ul>
+            <div class="system-status">
+                <div class="pulse-ring"></div>
+                <span>ML Engine: Online</span>
+            </div>
+        </nav>
+
+        <!-- Main Dashboard -->
+        <main class="dashboard-main">
+            <!-- Header Stats -->
+            <header class="top-bar glass-panel">
+                <div class="stat-box">
+                    <span class="stat-label">Transactions P/s</span>
+                    <h3 class="stat-value" id="tps-counter">0</h3>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Avg Risk Score</span>
+                    <h3 class="stat-value text-accent" id="avg-risk">0.00</h3>
+                </div>
+                <div class="stat-box alert-box">
+                    <span class="stat-label">Active Threats</span>
+                    <h3 class="stat-value text-danger" id="threat-counter">0</h3>
+                </div>
+            </header>
+
+            <!-- Live Transaction Feed & Visualization -->
+            <div class="grid-content">
+                <!-- Left: Live Feed Table -->
+                <section class="live-feed glass-panel">
+                    <div class="section-header">
+                        <h3><i class="fa-solid fa-bolt"></i> Real-time Transaction Stream</h3>
+                        <span class="badge badge-success" id="connection-status">Connecting...</span>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table class="stream-table">
+                            <thead>
+                                <tr>
+                                    <th>TXN ID</th>
+                                    <th>Amount</th>
+                                    <th>Location</th>
+                                    <th>Device</th>
+                                    <th>Risk Score</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-body">
+                                <!-- JS Injected Rows go here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Right: Analysis Panel -->
+                <aside class="analysis-panel">
+                    <div class="glass-panel risk-gauge-container">
+                        <h3>Latest Threat Analysis</h3>
+                        <div class="gauge-ring" id="latest-risk-ring">
+                            <span class="gauge-value" id="latest-risk-value">0%</span>
+                        </div>
+                        <p id="risk-description">Awaiting Data...</p>
+                        <div class="threat-details" id="threat-details">
+                            <!-- Details injected dynamically -->
+                        </div>
+                    </div>
+                    
+                    <div class="glass-panel map-placeholder">
+                        <h3>Geographic Hotspots</h3>
+                        <div class="map-bg">
+                            <i class="fa-solid fa-earth-americas"></i>
+                            <div class="pulse-point" style="top:40%; left:30%;"></div>
+                            <div class="pulse-point danger-pulse" style="top:60%; left:70%; display:none;" id="dynamic-pulse"></div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </main>
+    </div>
+
+    <!-- Socket.io connection -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
