@@ -52,3 +52,7 @@ plots/
 metrics.json
 report.md
 ml/fraud_model.pkl
+
+# MLflow local data (use MLflow server/S3 in production)
+mlflow-data/
+mlruns/

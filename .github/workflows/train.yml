@@ -1,4 +1,4 @@
-name: 🤖 ML Training Pipeline (CML)
+name: 🤖 ML Training Pipeline (CML + MLflow)
 
 on:
   push:
@@ -11,7 +11,6 @@ on:
     paths:
       - 'ml/**'
 
-# Chỉ chạy 1 pipeline cùng lúc để tránh race condition
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -27,11 +26,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. Checkout repo ────────────────────────────────────────────────
+      # ── 1. Checkout ──────────────────────────────────────────────────────
       - name: 📂 Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Setup Python ─────────────────────────────────────────────────
+      # ── 2. Setup Python ──────────────────────────────────────────────────
       - name: 🐍 Setup Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -43,48 +42,66 @@ jobs:
       - name: 🔧 Setup CML
         uses: iterative/setup-cml@v2
 
-      # ── 4. Install dependencies ──────────────────────────────────────────
+      # ── 4. Install dependencies ───────────────────────────────────────────
       - name: 📦 Install dependencies
         run: pip install -r ml/requirements.txt
 
-      # ── 5. Generate synthetic data ───────────────────────────────────────
-      - name: 🗄️ Generate synthetic training data
+      # ── 5. Start MLflow server (in background) ────────────────────────────
+      - name: 🗄️ Start MLflow tracking server
+        run: |
+          mkdir -p mlflow-data/mlruns mlflow-data/artifacts
+          mlflow server \
+            --backend-store-uri sqlite:///mlflow-data/mlruns/mlflow.db \
+            --default-artifact-root ./mlflow-data/artifacts \
+            --host 0.0.0.0 --port 5000 &
+          # Đợi server sẵn sàng
+          for i in {1..15}; do
+            curl -sf http://localhost:5000/health && echo "✅ MLflow ready" && break
+            echo "Waiting for MLflow... ($i/15)"
+            sleep 2
+          done
+
+      # ── 6. Generate synthetic data ────────────────────────────────────────
+      - name: 🗃️ Generate synthetic training data
         working-directory: ml
         run: |
           mkdir -p ../data
           python generate_synthetic_data.py
-          echo "✅ Data generated: $(wc -l < ../data/synthetic_transactions.csv) rows"
+          echo "✅ Rows: $(wc -l < ../data/synthetic_transactions.csv)"
 
-      # ── 6. Train model ───────────────────────────────────────────────────
-      - name: 🏋️ Train XGBoost fraud detection model
+      # ── 7. Train model + MLflow tracking ─────────────────────────────────
+      - name: 🏋️ Train XGBoost + log to MLflow
+        env:
+          MLFLOW_TRACKING_URI: http://localhost:5000
         run: |
           python ml/train_model.py \
-            --data-path data/synthetic_transactions.csv \
+            --data-path  data/synthetic_transactions.csv \
             --model-path ml/fraud_model.pkl \
             --metrics-path metrics.json \
-            --plots-dir plots
+            --plots-dir  plots \
+            --experiment fraud-detection \
+            --mlflow-uri http://localhost:5000
 
-      # ── 7. Create CML Report ─────────────────────────────────────────────
+      # ── 8. Create CML Report ──────────────────────────────────────────────
       - name: 📊 Create CML Report
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Đọc metrics từ JSON
           ACCURACY=$(python -c "import json; m=json.load(open('metrics.json')); print(m['accuracy'])")
           PRECISION=$(python -c "import json; m=json.load(open('metrics.json')); print(m['precision'])")
           RECALL=$(python -c "import json; m=json.load(open('metrics.json')); print(m['recall'])")
           F1=$(python -c "import json; m=json.load(open('metrics.json')); print(m['f1_score'])")
           AUC=$(python -c "import json; m=json.load(open('metrics.json')); print(m['auc_roc'])")
+          RUN_ID=$(python -c "import json; m=json.load(open('metrics.json')); print(m.get('mlflow_run_id','N/A'))")
           TRAIN_N=$(python -c "import json; m=json.load(open('metrics.json')); print(m['train_samples'])")
           TEST_N=$(python -c "import json; m=json.load(open('metrics.json')); print(m['test_samples'])")
-          FRAUD_R=$(python -c "import json; m=json.load(open('metrics.json')); print(m['fraud_ratio'])")
 
-          # Tạo markdown report
           cat > report.md << EOF
           # 🤖 ML Training Report — Fraud Detection
 
           > **Commit:** \`${{ github.sha }}\` | **Branch:** \`${{ github.ref_name }}\`
           > **Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          > **MLflow Run ID:** \`${RUN_ID}\`
 
           ## 📊 Model Metrics
 
@@ -102,7 +119,6 @@ jobs:
           |--|--|
           | Train samples | ${TRAIN_N} |
           | Test samples | ${TEST_N} |
-          | Fraud ratio | ${FRAUD_R} |
 
           ## 🗃️ Confusion Matrix
 
@@ -113,19 +129,18 @@ jobs:
           ![Feature Importance](plots/feature_importance.png)
 
           ---
-          *Generated by [CML](https://cml.dev) · $(date -u '+%Y-%m-%d %H:%M UTC')*
+          *Generated by [CML](https://cml.dev) + [MLflow](https://mlflow.org) · $(date -u '+%Y-%m-%d %H:%M UTC')*
           EOF
 
-          # Post report: dùng --pr khi là pull_request event, --commit khi là push
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             cml comment create --pr report.md
           else
             cml comment create --commit-sha=${{ github.sha }} report.md || \
-            echo "⚠️ Could not post commit comment (permission). Check repo Settings → Actions → Workflow permissions."
+            echo "⚠️ Could not post commit comment. Check repo Settings → Actions → Workflow permissions."
           fi
 
-      # ── 8. Upload model artifact ─────────────────────────────────────────
-      - name: 💾 Upload model artifact
+      # ── 9. Upload artifacts ───────────────────────────────────────────────
+      - name: 💾 Upload model + MLflow DB artifact
         uses: actions/upload-artifact@v4
         with:
           name: fraud-model-${{ github.sha }}
@@ -133,9 +148,10 @@ jobs:
             ml/fraud_model.pkl
             metrics.json
             plots/
+            mlflow-data/
           retention-days: 30
 
-      # ── 9. Upload metrics summary ────────────────────────────────────────
+      # ── 10. Job summary ───────────────────────────────────────────────────
       - name: 📋 Write job summary
         run: |
           echo "## 🎯 Training Complete" >> $GITHUB_STEP_SUMMARY
