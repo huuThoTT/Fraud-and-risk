@@ -45,3 +45,10 @@ MANIFEST
 .idea/
 .vscode/
 *.swp
+
+# ML / CML artifacts (generated in CI, not committed)
+data/*.csv
+plots/
+metrics.json
+report.md
+ml/fraud_model.pkl
