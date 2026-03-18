@@ -139,6 +139,19 @@ jobs:
             echo "⚠️ Could not post commit comment. Check repo Settings → Actions → Workflow permissions."
           fi
 
+      # ── 9. Verify Serving API ───────────────────────────────────────────
+      - name: 🚀 Verify Serving API
+        run: |
+          pip install -r serving/requirements.txt
+          export MODEL_PATH="ml/fraud_model.pkl"
+          nohup uvicorn serving.api.main:app --host 127.0.0.1 --port 8000 &
+          sleep 5
+          curl -s -X POST "http://127.0.0.1:8000/predict" \
+            -H "Content-Type: application/json" \
+            -d '{"transaction_id": "CI_TEST", "user_id": "ci_user", "amount": 100.0, "device_type": "desktop_web", "location": "US", "payment_method": "paypal", "is_guest_checkout": 0, "time_since_last_login_hours": 24.0}' \
+            | grep -q "fraud_probability" && echo "✅ API Verified"
+          pkill -f uvicorn
+
       # ── 9. Upload artifacts ───────────────────────────────────────────────
       - name: 💾 Upload model + MLflow DB artifact
         uses: actions/upload-artifact@v4

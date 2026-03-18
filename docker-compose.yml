@@ -50,3 +50,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # ── FastAPI Model Serving ───────────────────────────────────────────────
+  serving:
+    build:
+      context: ./serving
+    container_name: fraud-serving
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ml:/app/ml
+    environment:
+      - MODEL_PATH=/app/ml/fraud_model.pkl
+    depends_on:
+      - mlflow
